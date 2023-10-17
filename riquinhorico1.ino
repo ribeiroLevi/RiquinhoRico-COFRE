@@ -1,5 +1,3 @@
-
-
 #include <Keypad.h>
 #include <LiquidCrystal_I2C.h>
 #include <Servo.h>
@@ -9,12 +7,10 @@
 // setup do keypad
 const byte KEYPAD_ROWS = 4;
 const byte KEYPAD_COLS = 3;
-byte ROW_PINS[KEYPAD_ROWS] = {5,4,3,2};
-byte COL_PINS[KEYPAD_COLS] = {A1,A2,A3};
-char keys[KEYPAD_ROWS][KEYPAD_COLS] = {{'1', '2', '3'},
-                                       {'4', '5', '6'},
-                                       {'7', '8', '9'},
-                                       {'*', '0', '#'}};
+byte ROW_PINS[KEYPAD_ROWS] = {5, 4, 3, 2};
+byte COL_PINS[KEYPAD_COLS] = {A1, A2, A3};
+char keys[KEYPAD_ROWS][KEYPAD_COLS] = {
+    {'1', '2', '3'}, {'4', '5', '6'}, {'7', '8', '9'}, {'*', '0', '#'}};
 Keypad keypad =
     Keypad(makeKeymap(keys), ROW_PINS, COL_PINS, KEYPAD_ROWS, KEYPAD_COLS);
 
@@ -23,24 +19,22 @@ bool trancado = true;
 
 Servo myservo;
 
-
-
 int erros = 0;
 // setup do display - prestar atenção ao primeiro parâmetro(endereço) - 0x27
-LiquidCrystal_I2C lcd(32, 16, 2);
+LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 void setup() {
-senha = "1234";
-  
+  senha = "1234";
+
   Serial.begin(9600);
   lcd.init();
   lcd.setCursor(0, 0);
   lcd.backlight();
   lcd.display();
-  
+
   myservo.attach(7);
   myservo.write(90);
-  
+
   initialMessage();
 }
 
@@ -68,6 +62,7 @@ void initialMessage() {
     delay(50);
     lcd.print(message[i]);
   }
+  trancado = true;
 }
 
 void passwordInsert() {
@@ -85,8 +80,13 @@ void passwordInsert() {
     char key = keypad.getKey();
 
     for (int i = 0; i < result.length(); i++) {
+      Serial.println(result);
       lcd.setCursor(i + 6, 1);
       lcd.print("*");
+      if (key == '*') {
+        // limpa a senha
+        passwordInsert();
+      }
     }
     if (key >= '0' && key <= '9') {
       result += key;
@@ -109,14 +109,14 @@ void acessoLiberado() {
   lcd.print("Acesso Liberado!");
   delay(2000);
   lcd.clear();
-  lcd.print("A-REDEFINIR SENHA");
+  lcd.print("*-RDFN SENHA");
   lcd.setCursor(0, 1);
   lcd.print("#-TRANCAR");
 
   while (true) {
     char key = keypad.getKey();
     key == ' ';
-    if (key == 'A') {
+    if (key == '*') {
       logicaRedefinir();
       break;
     } else if (key == '#') {
@@ -129,6 +129,7 @@ void logicaRedefinir() {
   lcd.clear();
   senha = ' ';
   String novaSenha;
+  String testeSenha;
   lcd.print("NOVA SENHA:");
   lcd.setCursor(5, 1);
   String placeholder = "[____]";
@@ -146,21 +147,46 @@ void logicaRedefinir() {
     }
   }
   lcd.clear();
-  lcd.print("SENHA REDEFINIDA");
-  delay(2000);
-  
-  senha = novaSenha;
-  lcd.clear();
-  lcd.print("PRESSIONE #");
-  lcd.setCursor (0,1);
-  lcd.print ("PARA TRANCAR");
-  while (true){
-  if (keypad.getKey() == '#'){
-  	logicaTrancado();
-    break;
+  lcd.setCursor(0, 0);
+  lcd.print("REPITA A SENHA");
+  lcd.setCursor(5, 1);
+  lcd.print(placeholder);
+  while (testeSenha.length() < 4) {
+    char key = keypad.getKey();
+
+    for (int i = 0; i < testeSenha.length(); i++) {
+      lcd.setCursor(i + 6, 1);
+      lcd.print("*");
+    }
+    if (key >= '0' && key <= '9') {
+      testeSenha += key;
+    }
   }
+  if (testeSenha == novaSenha) {
+    lcd.clear();
+    lcd.print("SENHA REDEFINIDA");
+    delay(2000);
+
+    senha = novaSenha;
+    lcd.clear();
+    lcd.print("PRESSIONE #");
+    lcd.setCursor(0, 1);
+    lcd.print("PARA TRANCAR");
+    while (true) {
+      if (keypad.getKey() == '#') {
+        logicaTrancado();
+        break;
+      }
+    }
   }
-  
+  if (testeSenha != novaSenha) {
+    lcd.clear();
+    lcd.print("SENHAS NÃO");
+    lcd.setCursor(0, 1);
+    lcd.print("CORRESPONDEM");
+    delay(2000);
+    logicaRedefinir();
+  }
 }
 void logicaTrancado() {
   myservo.write(90);
