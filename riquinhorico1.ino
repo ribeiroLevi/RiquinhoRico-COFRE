@@ -1,3 +1,4 @@
+#include <EEPROM.h>
 #include <Keypad.h>
 #include <LiquidCrystal_I2C.h>
 #include <Servo.h>
@@ -24,8 +25,12 @@ int erros = 0;
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 void setup() {
-  senha = "1234";
-
+  if (isPasswordSetInEEPROM()) {
+    senha = readPasswordFromEEPROM();
+  } else {
+    senha = "1234";                // Set the default password
+    writePasswordToEEPROM(senha);  // Store the default password in EEPROM
+  }
   Serial.begin(9600);
   lcd.init();
   lcd.setCursor(0, 0);
@@ -39,6 +44,7 @@ void setup() {
 }
 
 void loop() {
+  Serial.println(senha);
   char caracter = keypad.getKey();
   if (caracter != NO_KEY && trancado == true) {
     lcd.clear();
@@ -92,7 +98,6 @@ void passwordInsert() {
       result += key;
     }
   }
-
   if (result == senha) {
     acessoLiberado();
   } else {
@@ -127,7 +132,7 @@ void acessoLiberado() {
 }
 void logicaRedefinir() {
   lcd.clear();
-  senha = ' ';
+  senha = "";
   String novaSenha;
   String testeSenha;
   lcd.print("NOVA SENHA:");
@@ -166,8 +171,11 @@ void logicaRedefinir() {
     lcd.clear();
     lcd.print("SENHA REDEFINIDA");
     delay(2000);
-
-    senha = novaSenha;
+    for (int i = 0; i < 4; i++) {
+      EEPROM.put(i, novaSenha[i]);
+      char character = EEPROM.read(i);
+      senha += character;
+    }
     lcd.clear();
     lcd.print("PRESSIONE #");
     lcd.setCursor(0, 1);
@@ -232,5 +240,30 @@ void acessoNegado() {
   } else if (erros >= 4) {
     lcd.clear();
     lcd.print("Acesso Bloqueado!");
+  }
+}
+
+bool isPasswordSetInEEPROM() {
+  for (int i = 0; i < 4; i++) {
+    char character = EEPROM.read(i);
+    if (character != 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+String readPasswordFromEEPROM() {
+  String result = "";
+  for (int i = 0; i < 4; i++) {
+    char character = EEPROM.read(i);
+    result += character;
+  }
+  return result;
+}
+
+void writePasswordToEEPROM(const String& newPassword) {
+  for (int i = 0; i < 4; i++) {
+    EEPROM.write(i, newPassword[i]);
   }
 }
