@@ -15,8 +15,8 @@ char keys[KEYPAD_ROWS][KEYPAD_COLS] = {
 Keypad keypad =
     Keypad(makeKeymap(keys), ROW_PINS, COL_PINS, KEYPAD_ROWS, KEYPAD_COLS);
 
-String senha;
-bool trancado = true;
+String password;
+bool locked = true;
 
 Servo myservo;
 
@@ -26,10 +26,10 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 void setup() {
   if (isPasswordSetInEEPROM()) {
-    senha = readPasswordFromEEPROM();
+    password = readPasswordFromEEPROM();
   } else {
-    senha = "1234";                // Set the default password
-    writePasswordToEEPROM(senha);  // Store the default password in EEPROM
+    password = "1234";                // Set the default password
+    writePasswordToEEPROM(password);  // Store the default password in EEPROM
   }
   Serial.begin(9600);
   lcd.init();
@@ -49,9 +49,9 @@ void loop() {
   if (customKey){
     Serial.println(customKey);
   }
-  Serial.println(senha);
+  Serial.println(password);
   char caracter = keypad.getKey();
-  if (caracter != NO_KEY && trancado == true) {
+  if (caracter != NO_KEY && locked == true) {
     lcd.clear();
     passwordInsert();
   }
@@ -61,19 +61,19 @@ void initialMessage() {
   lcd.clear();
   lcd.setBacklight(HIGH);
   lcd.setCursor(2, 0);
-  String nome = "RiquinhoRico";
+  String name = "RiquinhoRico";
   String message = "Aprt Qlqr Tcla";
 
-  for (int i = 0; i < nome.length(); i++) {
+  for (int i = 0; i < name.length(); i++) {
     delay(100);
-    lcd.print(nome[i]);
+    lcd.print(name[i]);
   }
   lcd.setCursor(1, 1);
   for (int i = 0; i < message.length(); i++) {
     delay(50);
     lcd.print(message[i]);
   }
-  trancado = true;
+  locked = true;
 }
 
 void passwordInsert() {
@@ -103,16 +103,16 @@ void passwordInsert() {
       result += key;
     }
   }
-  if (result == senha) {
-    acessoLiberado();
+  if (result == password) {
+    accessGranted();
   } else {
-    acessoNegado();
+    accessDenied();
   }
 }
 
-void acessoLiberado() {
+void accessGranted() {
   myservo.write(0);
-  trancado = false;
+  locked = false;
   erros = 0;
 
   lcd.clear();
@@ -127,33 +127,33 @@ void acessoLiberado() {
     char key = keypad.getKey();
     key == ' ';
     if (key == '*') {
-      logicaRedefinir();
+      resetLogic();
       break;
     } else if (key == '#') {
-      logicaTrancado();
+      lockedLogic();
       break;
     }
   }
 }
-void logicaRedefinir() {
+void resetLogic() {
   lcd.clear();
-  senha = "";
-  String novaSenha;
-  String testeSenha;
+  password = "";
+  String newPassword;
+  String passwordTest;
   lcd.print("NOVA SENHA:");
   lcd.setCursor(5, 1);
   String placeholder = "[____]";
   lcd.print(placeholder);
 
-  while (novaSenha.length() < 4) {
+  while (newPassword.length() < 4) {
     char key = keypad.getKey();
 
-    for (int i = 0; i < novaSenha.length(); i++) {
+    for (int i = 0; i < newPassword.length(); i++) {
       lcd.setCursor(i + 6, 1);
       lcd.print("*");
     }
     if (key >= '0' && key <= '9') {
-      novaSenha += key;
+      newPassword += key;
     }
   }
   lcd.clear();
@@ -161,25 +161,25 @@ void logicaRedefinir() {
   lcd.print("REPITA A SENHA");
   lcd.setCursor(5, 1);
   lcd.print(placeholder);
-  while (testeSenha.length() < 4) {
+  while (passwordTest.length() < 4) {
     char key = keypad.getKey();
 
-    for (int i = 0; i < testeSenha.length(); i++) {
+    for (int i = 0; i < passwordTest.length(); i++) {
       lcd.setCursor(i + 6, 1);
       lcd.print("*");
     }
     if (key >= '0' && key <= '9') {
-      testeSenha += key;
+      passwordTest += key;
     }
   }
-  if (testeSenha == novaSenha) {
+  if (passwordTest == newPassword) {
     lcd.clear();
     lcd.print("SENHA REDEFINIDA");
     delay(2000);
     for (int i = 0; i < 4; i++) {
-      EEPROM.put(i, novaSenha[i]);
+      EEPROM.put(i, newPassword[i]);
       char character = EEPROM.read(i);
-      senha += character;
+      password += character;
     }
     lcd.clear();
     lcd.print("PRESSIONE #");
@@ -187,29 +187,30 @@ void logicaRedefinir() {
     lcd.print("PARA TRANCAR");
     while (true) {
       if (keypad.getKey() == '#') {
-        logicaTrancado();
+        lockedLogic();
         break;
       }
     }
   }
-  if (testeSenha != novaSenha) {
+  if (passwordTest != newPassword) {
     lcd.clear();
     lcd.print("SENHAS NÃO");
     lcd.setCursor(0, 1);
     lcd.print("CORRESPONDEM");
     delay(2000);
-    logicaRedefinir();
+    resetLogic();
   }
 }
-void logicaTrancado() {
+void lockedLogic() {
   myservo.write(90);
   lcd.clear();
   lcd.print("TRANCADO!");
   delay(3000);
-  trancado = true;
+  locked = true;
   initialMessage();
 }
-void acessoNegado() {
+
+void accessDenied() {
   erros++;
   lcd.clear();
   lcd.print("Acesso Negado!");
